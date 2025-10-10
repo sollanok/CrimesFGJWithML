@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+.env/
+
+# Data
+*.csv
+*.xlsx
+*.json
+
+# OS files
+.DS_Store
+
+# Streamlit cache
+.streamlit/
+
+# VSCode or other editors
+.vscode/
+.idea/
