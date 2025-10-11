@@ -9,12 +9,13 @@ import folium
 from folium.plugins import HeatMap
 import os
 from folium import plugins
+import streamlit as st
 
 #-------------------------------
 #-------Initial Cleaning-------
 #-------------------------------
-
 # Load all data
+@st.cache_data
 def load_data():
   try:
     df = pd.read_csv('data/carpetasFGJ_acumulado_2025_01.csv')
@@ -33,6 +34,7 @@ def load_data():
 def strip_accents_upper(text):
   return unidecode(str(text)).upper().strip() if pd.notna(text) else text
 
+@st.cache_data
 def clean_data(df):  
   if df is not None:
     # Standardize date and time formats
@@ -125,123 +127,146 @@ def clean_data(df):
   
   return df
 
-uncleaned_crimes_df, boroughs_coordinates, metro_coordinates = load_data()
-cleaned_crimes_df = clean_data(uncleaned_crimes_df)
+def get_year_range(df):
+    return int(df['Year'].min()), int(df['Year'].max())
 
 #-------------------------------
 #-----Preparing for Mapping-----
 #-------------------------------
-# Filter crimes that include the word "ROBO" (anywhere in 'delito')
-robberies_df = cleaned_crimes_df[cleaned_crimes_df['delito'].str.contains('ROBO', case=False, na=False)]
-
-print(f"Total robbery-related crimes: {len(robberies_df)}")
-
-
-# Convert crimes DataFrame to GeoDataFrame
-crimes_gdf = gpd.GeoDataFrame(
+def create_map(year):
+  # Load everything
+  uncleaned_crimes_df, boroughs_coordinates, metro_coordinates = load_data()
+  cleaned_crimes_df = clean_data(uncleaned_crimes_df)
+  
+  # Filter crimes that include the word "ROBO" (anywhere in 'delito')
+  robberies_df = cleaned_crimes_df[
+    (cleaned_crimes_df['delito'].str.contains('ROBO', case=False, na=False)) &
+    (cleaned_crimes_df['Year'] == year)
+  ]
+  
+  print(f"Total robbery-related crimes: {len(robberies_df)}")
+  
+  # Convert crimes DataFrame to GeoDataFrame
+  crimes_gdf = gpd.GeoDataFrame(
     robberies_df,
     geometry=gpd.points_from_xy(robberies_df.longitud, robberies_df.latitud),
     crs="EPSG:4326"  # CDMX WGS84
-)
+  )
+  
+  # Load metro stations GeoJSON properly
+  metro_stations_gdf = gpd.read_file(metro_coordinates)
+  print(f"Loaded {len(metro_stations_gdf)} metro stations.")
 
-# Load metro stations GeoJSON properly
-metro_stations_gdf = gpd.read_file(metro_coordinates)
-print(f"Loaded {len(metro_stations_gdf)} metro stations.")
+  # Reproject both datasets to a metric CRS for buffering
+  crimes_proj = crimes_gdf.to_crs(epsg=3857)
+  metro_proj = metro_stations_gdf.to_crs(epsg=3857)
 
-# Reproject both datasets to a metric CRS for buffering
-crimes_proj = crimes_gdf.to_crs(epsg=3857)
-metro_proj = metro_stations_gdf.to_crs(epsg=3857)
+  # Create 50m buffers around metro stations
+  metro_proj['buffer'] = metro_proj.buffer(50)
 
-# Create 50m buffers around metro stations
-metro_proj['buffer'] = metro_proj.buffer(50)
+  # Convert buffer to a GeoDataFrame
+  metro_buffer_gdf = gpd.GeoDataFrame(
+      metro_proj[['nombre']],
+      geometry=metro_proj['buffer'],
+      crs=metro_proj.crs
+  )
 
-# Convert buffer to a GeoDataFrame
-metro_buffer_gdf = gpd.GeoDataFrame(
-    metro_proj[['nombre']],
-    geometry=metro_proj['buffer'],
-    crs=metro_proj.crs
-)
+  # Spatial join: find crimes within each buffer
+  joined = gpd.sjoin(crimes_proj, metro_buffer_gdf, predicate='within')
 
-# Spatial join: find crimes within each buffer
-joined = gpd.sjoin(crimes_proj, metro_buffer_gdf, predicate='within')
+  # Count crimes per station
+  station_crime_counts = joined.groupby('nombre').size().reset_index(name='crime_count')
 
-# Count crimes per station
-station_crime_counts = joined.groupby('nombre').size().reset_index(name='crime_count')
+  # Merge back with the metro GeoDataFrame
+  metro_with_crimes = metro_stations_gdf.merge(station_crime_counts, on='nombre', how='left')
+  metro_with_crimes['crime_count'] = metro_with_crimes['crime_count'].fillna(0)
 
-# Merge back with the metro GeoDataFrame
-metro_with_crimes = metro_stations_gdf.merge(station_crime_counts, on='nombre', how='left')
-metro_with_crimes['crime_count'] = metro_with_crimes['crime_count'].fillna(0)
+  #-------------------------------
+  #-------- Visualization --------
+  #-------------------------------
+  # Create folder if missing
+  os.makedirs("output", exist_ok=True)
 
-#-------------------------------
-#-------- Visualization --------
-#-------------------------------
-# Create folder if missing
-os.makedirs("output", exist_ok=True)
+  # Create base map
+  m = folium.Map(location=[19.4326, -99.1332], zoom_start=11, tiles="cartodbpositron")
 
-# Create base map
-m = folium.Map(location=[19.4326, -99.1332], zoom_start=11, tiles="cartodbpositron")
-
-# Add heatmap for robberies
-heat_data = [[row.geometry.y, row.geometry.x] for _, row in crimes_gdf.iterrows()]
-plugins.HeatMap(
-    heat_data, radius=12, blur=10, min_opacity=0.4, name="Robo Heatmap"
-).add_to(m)
-
-# Compute robberies near each metro station
-station_counts = []
-for idx, station in metro_stations_gdf.iterrows():
+  # Compute robberies near each metro station
+  station_counts = []
+  for idx, station in metro_stations_gdf.iterrows():
     nearby = crimes_gdf[
-        crimes_gdf.geometry.within(station.geometry.buffer(0.00005))
+      crimes_gdf.geometry.within(station.geometry.buffer(0.00005))
     ]  # ~50m radius
     station_counts.append(
-        {
-            "nombre": station["nombre"],
-            "lat": station.geometry.y,
-            "lon": station.geometry.x,
-            "robos": len(nearby),
-        }
+      {
+        "nombre": station["nombre"],
+        "lat": station.geometry.y,
+        "lon": station.geometry.x,
+        "robos": len(nearby),
+      }
     )
 
-station_df = pd.DataFrame(station_counts)
+  station_df = pd.DataFrame(station_counts)
 
-# Normalize robbery counts for circle sizing
-max_robos = station_df["robos"].max() if station_df["robos"].max() > 0 else 1
-station_df["radius"] = (station_df["robos"] / max_robos) * 40
+  # Normalize robbery counts for circle sizing
+  max_robos = station_df["robos"].max() if station_df["robos"].max() > 0 else 1
+  station_df["radius"] = (station_df["robos"] / max_robos) * 40
 
-# Robbery frequency visualization
-robbery_layer = folium.FeatureGroup(name="Robos cerca o en estaciones", show=True)
-for _, row in station_df.iterrows():
-    color = (
+  # Robbery frequency visualization
+  robbery_layer = folium.FeatureGroup(name="Robberies near or in stations.", show=True)
+  for _, row in station_df.iterrows():
+    if row["robos"] == 0:
+      color = "lightblue"
+      radius = 3  # Minimum visible radius
+    else:
+      color = (
         "red"
         if row["robos"] > max_robos * 0.6
         else "orange"
         if row["robos"] > max_robos * 0.3
         else "green"
-    )
+      )
+      radius = row["radius"]
+
     folium.CircleMarker(
-        location=[row["lat"], row["lon"]],
-        radius=row["radius"],
-        color=color,
-        fill=True,
-        fill_opacity=0.6,
-        popup=f"<b>{row['nombre']}</b><br>Robos: {row['robos']}",
+      location=[row["lat"], row["lon"]],
+      radius=radius,
+      color=color,
+      fill=True,
+      fill_opacity=0.6,
+      popup=f"<b>{row['nombre']}</b><br>Robberies: {row['robos']}",
     ).add_to(robbery_layer)
-robbery_layer.add_to(m)
+  robbery_layer.add_to(m)
 
-# Add metro station markers
-metro_layer = folium.FeatureGroup(name="Líneas del metro", show=True)
-for _, row in metro_stations_gdf.iterrows():
+  # Add metro station markers
+  metro_layer = folium.FeatureGroup(name="Metro stations", show=False)
+  for _, row in metro_stations_gdf.iterrows():
     folium.Marker(
-        location=[row.geometry.y, row.geometry.x],
-        icon=folium.Icon(color="blue", icon="train", prefix="fa"),
-        popup=f"<b>{row['nombre']}</b><br>{row['ubicacion']}",
+      location=[row.geometry.y, row.geometry.x],
+      icon=folium.Icon(color="blue", icon="train", prefix="fa"),
+      popup=f"<b>{row['nombre']}</b><br>{row['ubicacion']}",
     ).add_to(metro_layer)
-metro_layer.add_to(m)
+  metro_layer.add_to(m)
+  
+  folium.GeoJson(
+    boroughs_coordinates,
+    name='Boroughs',
+    style_function=lambda x: {'fillOpacity': 0, 'color': 'black', 'weight': 0.5}
+  ).add_to(m)
 
-# Add layer control
-folium.LayerControl(collapsed=False).add_to(m)
+  # Add layer control
+  folium.LayerControl(collapsed=False).add_to(m)
 
-# Save map
-m.save("output/robos_near_metro.html")
+  # Save map
+  m.save("output/robos_near_metro.html")
 
-print("Map generated in: output/robos_near_metro.html")
+  print("Map generated in: output/robos_near_metro.html")
+
+#-------------------------------
+#------------Slider-------------
+#-------------------------------
+# Create slider functions
+def year_slider(df, label="Slide to select a year"):
+  min_year = int(df['Year'].min())
+  max_year = int(df['Year'].max())
+  selected_year = st.slider(label, min_year, max_year, min_year)
+  return selected_year
