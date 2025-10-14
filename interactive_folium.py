@@ -10,6 +10,7 @@ from folium.plugins import HeatMap
 import os
 from folium import plugins
 import streamlit as st
+from streamlit.components.v1 import html
 
 #-------------------------------
 #-------Initial Cleaning-------
@@ -129,22 +130,57 @@ def clean_data(df):
 
 def get_year_range(df):
     return int(df['Year'].min()), int(df['Year'].max())
+  
+#-------------------------------
+#--------Load All Years---------
+#-------------------------------
+@st.cache_data
+def load_all_years():
+  # Load raw data and geojson paths
+  df_raw, _, _ = load_data()
+    
+  # Clean full dataset
+  cleaned_df = clean_data(df_raw)
+    
+  # Get year range
+  min_year, max_year = get_year_range(cleaned_df)
+    
+  # Split into yearly DataFrames
+  yearly_dfs = {
+    year: cleaned_df[cleaned_df['Year'] == year].reset_index(drop=True)
+    for year in range(min_year, max_year + 1)
+  }
+    
+  print(f"Loaded and split data for years {min_year} to {max_year}.")
+  return yearly_dfs
+  
 
 #-------------------------------
 #-----Preparing for Mapping-----
 #-------------------------------
 def create_map(year):
-  # Load everything
-  uncleaned_crimes_df, boroughs_coordinates, metro_coordinates = load_data()
-  cleaned_crimes_df = clean_data(uncleaned_crimes_df)
-  
-  # Filter crimes that include the word "ROBO" (anywhere in 'delito')
+  # Load all years once
+  yearly_data = load_all_years()
+
+  # Check if the requested year exists
+  if year not in yearly_data:
+    print(f"Year {year} not found in data.")
+    return
+
+  # Use the cleaned DataFrame for the selected year
+  cleaned_crimes_df = yearly_data[year]
+
+  # Load geojson paths
+  _, boroughs_coordinates, metro_coordinates = load_data()
+
+  # Filter robbery-related crimes
+  if 'delito' not in cleaned_crimes_df.columns:
+    print("Error: 'delito' column missing from cleaned data.")
+    return
+
   robberies_df = cleaned_crimes_df[
-    (cleaned_crimes_df['delito'].str.contains('ROBO', case=False, na=False)) &
-    (cleaned_crimes_df['Year'] == year)
+    cleaned_crimes_df['delito'].str.contains('ROBO', case=False, na=False)
   ]
-  
-  print(f"Total robbery-related crimes: {len(robberies_df)}")
   
   # Convert crimes DataFrame to GeoDataFrame
   crimes_gdf = gpd.GeoDataFrame(
@@ -257,9 +293,8 @@ def create_map(year):
   folium.LayerControl(collapsed=False).add_to(m)
 
   # Save map
-  m.save("output/robos_near_metro.html")
-
-  print("Map generated in: output/robos_near_metro.html")
+  map_html = m._repr_html_()
+  html(map_html, height=600, scrolling=True)
 
 #-------------------------------
 #------------Slider-------------
