@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
-# --- MODIFIED IMPORT ---
-# We now also import the new geocoding functions
+import folium
 from data_processing import (
     load_data, 
     clean_data, 
@@ -10,51 +9,49 @@ from data_processing import (
     geocode_address, 
     reverse_geocode_coords
 )
-# --- END MODIFICATION ---
 import os
 
 #-------------------------------
-#---------Custom Styling--------
+#--------Custom Styling---------
 #-------------------------------
 st.markdown("""
     <style>
     html, body {
-        background-color: #F1EBDE !important;
-        color: black !important;
+        background-color: #3D2A00 !important;
     }
     [data-testid="stAppViewContainer"], [data-testid="stAppViewBlockContainer"] {
-        background-color: #F1EBDE !important;
+        background-color: #3D2A00 !important;
     }
     header[data-testid="stHeader"] {
-        background-color: #F1EBDE !important;
+        background-color: #3D2A00 !important;
     }
     .st-emotion-cache-1avcm0n {
-        background-color: #F1EBDE !important;
+        background-color: #3D2A00 !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
 #-------------------------------
-#--------- Main Page -----------
+#----------Main Page------------
 #-------------------------------
 
 st.markdown("""
     <h1 style='
-        color: black;
+        color: white;
         font-size: 3em;
         font-weight: bold;
     '>Robberies near or in metro stations in Mexico City</h1>
 """, unsafe_allow_html=True)
 
 st.markdown("""
-    <p style='color:black; font-size:1.1em;'>
+    <p style='color:white; font-size:1.1em;'>
         This map shows the amount of robberies registered in a single year. To change the year
         selected you can use the slider below.
     </p>
 """, unsafe_allow_html=True)
 
 #-------------------------------
-#-------- Load & Clean ---------
+#---------Load & Clean----------
 #-------------------------------
 # This is cached, so it only runs once
 df_raw, _, _ = load_data()
@@ -63,19 +60,17 @@ if df_raw is not None:
     df_clean = clean_data(df_raw)
 
     #-------------------------------
-    #-------- Year Slider ----------
+    #---------Year Slider-----------
     #-------------------------------
     selected_year = year_slider(df_clean)
 
     #-------------------------------
-    #-------- Map Creation ---------
+    #---------Map Creation----------
     #-------------------------------
     st.markdown(f"""
-        <h3 style='color:black;'>Year selected: {selected_year}</h3>
+        <h3 style='color:white;'>Year selected: {selected_year}</h3>
     """, unsafe_allow_html=True)
     
-    # Note: create_map() now returns HTML, which can't be made interactive.
-    # See "Next Steps" in my chat response for how to improve this.
     create_map(selected_year)
 
 else:
@@ -84,14 +79,15 @@ else:
 
 st.divider()
 
-# --- NEW SECTION: Geocoding Tools ---
-
+#-------------------------------
+#-----------Geocoding-----------
+#-------------------------------
 st.markdown("""
-    <h2 style='color: black; font-weight: bold;'>Geocoding Tools</h2>
+    <h2 style='color: white; font-weight: bold;'>Geocoding Tools</h2>
 """, unsafe_allow_html=True)
 
-# --- 1. Geocoding (Address -> Coords) ---
-st.markdown("<h3 style='color: black;'>Find Coordinates from Address</h3>", unsafe_allow_html=True)
+# 1. Geocoding (Address -> Coords)
+st.markdown("<h3 style='color: white;'>Find Coordinates from Address</h3>", unsafe_allow_html=True)
 st.markdown("Enter an address in Mexico City to find its latitude and longitude. (e.g., *Palacio de Bellas Artes, Mexico City*)")
 
 address_input = st.text_input("Enter Address:")
@@ -113,8 +109,8 @@ if st.button("Find Coordinates"):
         st.warning("Please enter an address.")
 
 
-# --- 2. Reverse Geocoding (Coords -> Address) ---
-st.markdown("<h3 style='color: black;'>Find Address from Coordinates</h3>", unsafe_allow_html=True)
+# 2. Reverse Geocoding (Coords -> Address)
+st.markdown("<h3 style='color: white;'>Find Address from Coordinates</h3>", unsafe_allow_html=True)
 st.markdown("Enter coordinates to find the nearest address. (e.g., Lat: `19.4352`, Lon: `-99.1412`)")
 
 col1, col2 = st.columns(2)

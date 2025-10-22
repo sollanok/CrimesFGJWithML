@@ -17,7 +17,7 @@ from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 import ssl, certifi
 
 #-------------------------------
-#-------Initial Cleaning-------
+#-------Initial Cleaning--------
 #-------------------------------
 # Load all data
 @st.cache_data
@@ -138,6 +138,9 @@ def clean_data(df):
 def get_year_range(df):
     return int(df['Year'].min()), int(df['Year'].max())
 
+#-------------------------------
+#----------Nominatim------------
+#-------------------------------
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
@@ -148,7 +151,6 @@ else:
 
 @st.cache_data
 def get_geolocator():
-    """Initializes the Nominatim geolocator."""
     ssl_context = ssl.create_default_context(cafile=certifi.where())
     try:
       _create_unverified_https_context = ssl._create_unverified_context
@@ -162,11 +164,6 @@ def get_geolocator():
 
 @st.cache_data
 def geocode_address(address):
-  """
-  Converts a string address into latitude and longitude.
-  Adds a 1-second delay to respect Nominatim's rate limit.
-  Biased to Mexico (country_codes="MX").
-  """
   try:
     geolocator = get_geolocator()
     # Respect rate limit
@@ -185,11 +182,6 @@ def geocode_address(address):
 
 @st.cache_data
 def reverse_geocode_coords(lat, lon):
-  """
-  Converts latitude and longitude into a human-readable address.
-  Adds a 1-second delay to respect Nominatim's rate limit.
-  Returns the address in Spanish (language="es").
-  """
   try:
     geolocator = get_geolocator()
     # Respect rate limit
