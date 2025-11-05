@@ -1,128 +1,128 @@
 import streamlit as st
-import streamlit.components.v1 as components
-import folium
-from data_processing import (
-    load_data, 
-    clean_data, 
-    year_slider, 
-    create_map, 
-    geocode_address, 
-    reverse_geocode_coords
-)
-import os
+import base64
+from app.theme import theme_css
 
-#-------------------------------
-#--------Custom Styling---------
-#-------------------------------
-st.markdown("""
-    <style>
-    html, body {
-        background-color: #3D2A00 !important;
-    }
-    [data-testid="stAppViewContainer"], [data-testid="stAppViewBlockContainer"] {
-        background-color: #3D2A00 !important;
-    }
-    header[data-testid="stHeader"] {
-        background-color: #3D2A00 !important;
-    }
-    .st-emotion-cache-1avcm0n {
-        background-color: #3D2A00 !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Inject theme
+st.markdown(theme_css(), unsafe_allow_html=True)
 
-#-------------------------------
-#----------Main Page------------
-#-------------------------------
+if "role" not in st.session_state:
+    st.session_state.role = None
 
-st.markdown("""
-    <h1 style='
-        color: white;
-        font-size: 3em;
-        font-weight: bold;
-    '>Robberies near or in metro stations in Mexico City</h1>
-""", unsafe_allow_html=True)
+ROLES = ["Soy de Thales", "Soy policía"]
 
-st.markdown("""
-    <p style='color:white; font-size:1.1em;'>
-        This map shows the amount of robberies registered in a single year. To change the year
-        selected you can use the slider below.
-    </p>
-""", unsafe_allow_html=True)
-
-#-------------------------------
-#---------Load & Clean----------
-#-------------------------------
-# This is cached, so it only runs once
-df_raw, _, _ = load_data()
-
-if df_raw is not None:
-    df_clean = clean_data(df_raw)
-
-    #-------------------------------
-    #---------Year Slider-----------
-    #-------------------------------
-    selected_year = year_slider(df_clean)
-
-    #-------------------------------
-    #---------Map Creation----------
-    #-------------------------------
-    st.markdown(f"""
-        <h3 style='color:white;'>Year selected: {selected_year}</h3>
-    """, unsafe_allow_html=True)
+def login():
+    # Background image logic
+    def encode_image(path):
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
     
-    create_map(selected_year)
+    bright_img = encode_image("assets/images/landing-bright.png")
+    dark_img = encode_image("assets/images/landing-dark.png")
+    st.markdown(f"""
+        <style>
+        @media (prefers-color-scheme: light) {{
+            [data-testid="stAppViewContainer"] {{
+                background-image: url("data:image/png;base64,{bright_img}");
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+            }}
+        }}
+        @media (prefers-color-scheme: dark) {{
+            [data-testid="stAppViewContainer"] {{
+                background-image: url("data:image/png;base64,{dark_img}");
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+            }}
+        }}
+        </style>
+    """, unsafe_allow_html=True)
 
+    st.markdown("""
+        <div style='text-align: center;'>
+            <h1 style='font-size: 64px; margin-bottom: 0;'>Bienvenido</h1>
+            <p style='font-size: 28px; margin-top: 8px;'>Escoge qué rol es el que mejor te describe:</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        selected_role = st.segmented_control(
+            label="",
+            options=["Soy policía", "Soy de Thales"],
+            selection_mode="single",
+            label_visibility="collapsed",
+            width=150
+        )
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([2, 1, 2])
+    with col2:
+        if st.button("Entrar") and selected_role:
+            st.session_state.role = selected_role
+            st.rerun()
+
+
+
+def logout():
+    st.markdown("""
+                <div style='text-align: center;'>
+                <p style='font-size: 28px; margin-top: 8px;'>Salir de la sesión</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+    if st.button("Salir"):
+        st.session_state.role = None
+        st.rerun()
+
+role = st.session_state.role
+logout_page = st.Page(logout, title="Salir de sesión", icon=":material/logout:")
+
+dashboard = st.Page(
+    "my_pages/dashboard.py",
+    title="Dashboard",
+    icon=":material/dashboard:",
+)
+eda = st.Page(
+    "my_pages/eda.py",
+    title="Exploración Analítica",
+    icon=":material/search:",
+)
+
+prediction = st.Page(
+    "my_pages/prediction.py",
+    title="Predicción con ML",
+    icon=":material/science:",
+)
+
+chatbot = st.Page(
+    "my_pages/chatbot.py",
+    title="Chatbot",
+    icon=":material/chat:",
+)
+
+account_page = [logout_page]
+visualization_page = [dashboard]
+ml_page = [prediction]
+eda_page = [eda]
+chat_page = [chatbot]
+
+page_dict = {}
+
+if st.session_state.role in ["Soy de Thales", "Soy policía"]:
+    page_dict["Dashboard"] = visualization_page
+if st.session_state.role in ["Soy de Thales", "Soy policía"]:
+    page_dict["Exploración Analítica"] = eda_page
+if st.session_state.role == "Soy de Thales":
+    page_dict["Predicción con ML"] = ml_page
+if st.session_state.role in ["Soy de Thales"]:
+    page_dict["Chatbot"] = chat_page
+
+if len(page_dict) > 0:
+    pg = st.navigation({"Account": account_page} | page_dict)
 else:
-    st.error("Failed to load crime data. Please check file paths and try again.")
-    st.stop() # Stop the app if data fails to load
+    pg = st.navigation([st.Page(login)])
 
-st.divider()
-
-#-------------------------------
-#-----------Geocoding-----------
-#-------------------------------
-st.markdown("""
-    <h2 style='color: white; font-weight: bold;'>Geocoding Tools</h2>
-""", unsafe_allow_html=True)
-
-# 1. Geocoding (Address -> Coords)
-st.markdown("<h3 style='color: white;'>Find Coordinates from Address</h3>", unsafe_allow_html=True)
-st.markdown("Enter an address in Mexico City to find its latitude and longitude. (e.g., *Palacio de Bellas Artes, Mexico City*)")
-
-address_input = st.text_input("Enter Address:")
-if st.button("Find Coordinates"):
-    if address_input:
-        with st.spinner(f"Geocoding '{address_input}'... (This takes a moment due to rate limits)"):
-            lat, lon = geocode_address(address_input)
-            if lat and lon:
-                st.success(f"Coordinates Found: `{lat}, {lon}`")
-                
-                # Create a simple map centered on the new location
-                m = folium.Map(location=[lat, lon], zoom_start=15)
-                folium.Marker([lat, lon], popup=address_input).add_to(m)
-                components.html(m._repr_html_(), height=300)
-                
-            else:
-                st.error("Address not found or geocoding failed.")
-    else:
-        st.warning("Please enter an address.")
-
-
-# 2. Reverse Geocoding (Coords -> Address)
-st.markdown("<h3 style='color: white;'>Find Address from Coordinates</h3>", unsafe_allow_html=True)
-st.markdown("Enter coordinates to find the nearest address. (e.g., Lat: `19.4352`, Lon: `-99.1412`)")
-
-col1, col2 = st.columns(2)
-with col1:
-    lat_input = st.number_input("Latitude:", format="%.6f", value=19.435200)
-with col2:
-    lon_input = st.number_input("Longitude:", format="%.6f", value=-99.141200)
-
-if st.button("Find Address"):
-    with st.spinner(f"Finding address for `({lat_input}, {lon_input})`..."):
-        address_output = reverse_geocode_coords(lat_input, lon_input)
-        if address_output:
-            st.success(f"Address Found: {address_output}")
-        else:
-            st.error("Could not find an address for those coordinates.")
+pg.run()
