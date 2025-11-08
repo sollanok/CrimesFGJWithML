@@ -8,8 +8,6 @@ st.markdown(theme_css(), unsafe_allow_html=True)
 if "role" not in st.session_state:
     st.session_state.role = None
 
-ROLES = ["Soy de Thales", "Soy policía"]
-
 def login():
     # Background image logic
     def encode_image(path):
@@ -68,7 +66,7 @@ def login():
 
 def logout():
     st.markdown("""
-                <div style='text-align: center;'>
+                <div style='text-align: left;'>
                 <p style='font-size: 28px; margin-top: 8px;'>Salir de la sesión</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -85,6 +83,7 @@ dashboard = st.Page(
     title="Dashboard",
     icon=":material/dashboard:",
 )
+
 eda = st.Page(
     "my_pages/eda.py",
     title="Exploración Analítica",
