@@ -21,7 +21,7 @@ def run_query(query: str) -> pd.DataFrame:
 @st.cache_data
 def get_crimes_near_stations(radius_m=50):
     query = """
-    SELECT latitud, longitud, delito, fecha_hecho
+    SELECT latitud, longitud, delito, fecha_hecho, hora_hecho
     FROM crimes_clean
     WHERE latitud IS NOT NULL AND longitud IS NOT NULL
     """
@@ -30,7 +30,7 @@ def get_crimes_near_stations(radius_m=50):
 @st.cache_data
 def get_metro_stations():
     query = """
-    SELECT linea, lat, lon
+    SELECT nombre, linea, lat, lon
     FROM lineas_metro
     WHERE lat IS NOT NULL AND lon IS NOT NULL
     """
@@ -107,3 +107,20 @@ def get_hourly_robberies():
     AND fecha_hecho IS NOT NULL
     """
     return run_query(query)
+
+
+# ----------------------------
+# ------ VISUALIZATION -------
+# ----------------------------
+@st.cache_data
+def get_alcaldia_boundaries():
+    query = """
+    SELECT
+      "properties.NOMGEO" AS nombre,
+      "geometry.type" AS geom_type,
+      "geometry.coordinates" AS coordinates
+    FROM limites_alcaldias
+    WHERE "geometry.type" IN ('Polygon', 'MultiPolygon')
+    """
+    return run_query(query)
+

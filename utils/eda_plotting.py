@@ -8,7 +8,13 @@ from shapely.geometry import Point
 from sklearn.neighbors import BallTree
 import streamlit as st
 
-from utils.database_queries import get_crimes_near_stations, get_metro_stations, get_robbery_counts_by_borough, get_physical_crimes, get_hourly_robberies
+from utils.database_queries import (
+    get_crimes_near_stations,
+    get_metro_stations,
+    get_robbery_counts_by_borough,
+    get_physical_crimes,
+    get_hourly_robberies
+)
 
 @st.cache_data
 def compute_line_crime_stats(radius_m=50):

@@ -121,7 +121,7 @@ def create_database():
             df_alcaldias.dropna(how='all', inplace=True)
             con.register("df_alcaldias", df_alcaldias)
             con.execute("CREATE TABLE alcaldias_cdmx AS SELECT * FROM df_alcaldias")
-            print("✓ Table 3: 'alcaldias_cdmx' CREATED")
+            print("Table 3: 'alcaldias_cdmx' CREATED")
         except Exception as e:
             print(f"Error loading 'estaciones_metro': {e}")
         

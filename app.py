@@ -78,9 +78,9 @@ def logout():
 role = st.session_state.role
 logout_page = st.Page(logout, title="Salir de sesión", icon=":material/logout:")
 
-dashboard = st.Page(
-    "my_pages/dashboard.py",
-    title="Dashboard",
+visualization = st.Page(
+    "my_pages/visualization.py",
+    title="Visualización",
     icon=":material/dashboard:",
 )
 
@@ -103,7 +103,7 @@ chatbot = st.Page(
 )
 
 account_page = [logout_page]
-visualization_page = [dashboard]
+visualization_page = [visualization]
 ml_page = [prediction]
 eda_page = [eda]
 chat_page = [chatbot]
@@ -111,7 +111,7 @@ chat_page = [chatbot]
 page_dict = {}
 
 if st.session_state.role in ["Soy de Thales", "Soy policía"]:
-    page_dict["Dashboard"] = visualization_page
+    page_dict["Visualización"] = visualization_page
 if st.session_state.role in ["Soy de Thales", "Soy policía"]:
     page_dict["Exploración Analítica"] = eda_page
 if st.session_state.role == "Soy de Thales":
