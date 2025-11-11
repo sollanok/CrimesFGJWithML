@@ -9,7 +9,7 @@ from sklearn.neighbors import BallTree
 import streamlit as st
 
 from utils.database_queries import (
-    get_crimes_near_stations,
+    get_crimes,
     get_metro_stations,
     get_robbery_counts_by_borough,
     get_physical_crimes,
@@ -19,7 +19,7 @@ from utils.database_queries import (
 @st.cache_data
 def compute_line_crime_stats(radius_m=50):
     # These functions will hit the cache after the first run
-    df_crimes = get_crimes_near_stations()
+    df_crimes = get_crimes()
     df_metro = get_metro_stations()
     
     # Convert to GeoDataFrames

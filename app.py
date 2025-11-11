@@ -120,7 +120,7 @@ if st.session_state.role in ["Soy de Thales"]:
     page_dict["Chatbot"] = chat_page
 
 if len(page_dict) > 0:
-    pg = st.navigation({"Account": account_page} | page_dict)
+    pg = st.navigation({"Cuenta": account_page} | page_dict)
 else:
     pg = st.navigation([st.Page(login)])
 

@@ -5,15 +5,16 @@ import folium
 import json
 from sklearn.neighbors import BallTree
 from utils.database_queries import (
-    get_crimes_near_stations,
+    get_crimes,
     get_metro_stations,
     get_alcaldia_boundaries
 )
+from geopy.geocoders import Nominatim
 
 # Can't do BallTree in query, so use another function here.
 @st.cache_data
-def get_crime_counts_per_station(radius_m=50):
-    df_crimes = get_crimes_near_stations()
+def get_crime_counts_per_station(radius_m=100):
+    df_crimes = get_crimes()
     df_stations = get_metro_stations()
 
     # Prepare coordinates in radians
@@ -44,7 +45,7 @@ def get_crime_counts_per_station(radius_m=50):
 
 # Plot static Folium map
 @st.cache_data
-def plot_crime_density_map(radius_m=50, highlight_station=None):
+def plot_crime_density_map(radius_m=100, highlight_station=None):
     df_stations = get_crime_counts_per_station(radius_m=radius_m)
     df_bounds = get_alcaldia_boundaries()
 
@@ -148,7 +149,7 @@ def plot_crime_density_map(radius_m=50, highlight_station=None):
 
 # For search bar
 def get_station_stats(station_name, radius_m=50):
-    df_crimes = get_crimes_near_stations()
+    df_crimes = get_crimes()
     df_stations = get_metro_stations()
 
     # Match station by name
@@ -181,3 +182,58 @@ def get_station_stats(station_name, radius_m=50):
     }
 
     return station, stats
+
+# Crime comparison
+def geocode_address(address):
+    geolocator = Nominatim(user_agent="cdmx_crime_map")
+    location = geolocator.geocode(address)
+    if location:
+        return {"lat": location.latitude, "lon": location.longitude, "name": location.address}
+    return None
+
+def get_crimes_near_point(lat, lon, radius_m=100):
+    df_crimes = get_crimes()
+    crime_coords = np.radians(df_crimes[['latitud', 'longitud']].values)
+    point = np.radians([[lat, lon]])
+    tree = BallTree(crime_coords, metric='haversine')
+    r = radius_m / 6371000.0
+    idxs = tree.query_radius(point, r=r)[0]
+    nearby = df_crimes.iloc[idxs].copy()
+    nearby['hora'] = pd.to_datetime(nearby['fecha_hecho']).dt.hour
+    return nearby
+
+def summarize_crimes(df):
+    total = len(df)
+    robos = df[df['delito'].str.contains('ROBO', case=False)]
+    robo_count = len(robos)
+    most_common_robo = robos['delito'].value_counts().idxmax() if not robos.empty else None
+    avg_hour = int(df['hora'].mean()) if not df.empty else None
+    return {
+        "total_crimes": total,
+        "robos": robo_count,
+        "most_common_robo": most_common_robo,
+        "avg_hour": avg_hour
+    }
+
+def plot_comparison_map(station_coords, station_name, address_coords, address_label):
+    m = folium.Map(location=[19.4326, -99.1332], zoom_start=11, tiles="CartoDB positron")
+
+    folium.CircleMarker(
+        location=station_coords,
+        radius=10,
+        color="#2B7DE9",
+        fill=True,
+        fill_opacity=0.9,
+        popup=f"<b>Estación:</b> {station_name}"
+    ).add_to(m)
+
+    folium.CircleMarker(
+        location=address_coords,
+        radius=10,
+        color="#2BDE73",
+        fill=True,
+        fill_opacity=0.9,
+        popup=f"<b>Dirección:</b> {address_label}"
+    ).add_to(m)
+
+    return m

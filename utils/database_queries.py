@@ -19,7 +19,7 @@ def run_query(query: str) -> pd.DataFrame:
 # ---------- EDA -------------
 # ----------------------------
 @st.cache_data
-def get_crimes_near_stations(radius_m=50):
+def get_crimes(radius_m=100):
     query = """
     SELECT latitud, longitud, delito, fecha_hecho, hora_hecho
     FROM crimes_clean
