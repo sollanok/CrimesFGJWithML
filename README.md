@@ -1,4 +1,4 @@
-# README Activity 4 (team): Advanced Map Visualization with Folium
+# README
 
 ### Activity 4 (team): Advanced Map Visualization with Folium
 
@@ -11,38 +11,37 @@
 | Victor Martínez      | A01352187 |
 | Emilio Alviter       | A01663810 |
 
-## Prerequisites
-Before running the app, download the crime dataset:
-- [Crimes CSV](https://drive.google.com/file/d/1l4OfwFxyvMPYhIpccK-4OyAnMgplqvf8/view?usp=sharing)
-Place the downloaded file inside a folder named `data` at the root of the project.
+## Release:
+https://crime-analysis-for-thales.streamlit.app/
+
+
 ---
-## How to Run
+## Run App Locally
 1. Open your terminal and navigate to a working directory:
 
-       mkdir CrimesFGJWithML
-       cd CrimesFGJWithML
+          mkdir CrimesFGJWithML
+          cd CrimesFGJWithML
 
 3. Clone the repository:
 
-        git clone https://github.com/sollanok/CrimesFGJWithML.git
-        cd CrimesFGJWithML
+          git clone https://github.com/sollanok/CrimesFGJWithML.git
+          cd CrimesFGJWithML
+
+3. (Optional but Recommended) Create a virtual environment:
+
+          python -m venv my_env
+   * On Windows
+
+            my_env\Scripts\activate
+
+   * On Mac/Linux
+
+            source my_env/bin/activate
 
 3. Install dependencies:
 
-        pip install -r requirements.txt
+          pip install -r requirements.txt
 
+4. Launch the Streamlit app:
 
-4. Place the downloaded CSV file inside the data folder:
-
-       CrimesFGJWithML|
-
-                      ├── app.py
-
-                      ├── data/
-
-                      │   └── crimes.csv
-
-
-Launch the Streamlit app:
-
-      streamlit run app.py
+          streamlit run app.py
