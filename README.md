@@ -1,4 +1,4 @@
-# README Activity 4 (team): Advanced Map Visualization with Folium
+# README
 
 ### Activity 4 (team): Advanced Map Visualization with Folium
 
