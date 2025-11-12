@@ -186,7 +186,7 @@ def get_station_stats(station_name, radius_m=50):
 # Crime comparison
 def geocode_address(address):
     geolocator = Nominatim(user_agent="cdmx_crime_map")
-    location = geolocator.geocode(address)
+    location = geolocator.geocode(f"{address}, Mexico City", timeout=10)
     if location:
         return {"lat": location.latitude, "lon": location.longitude, "name": location.address}
     return None
