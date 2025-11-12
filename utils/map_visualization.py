@@ -10,6 +10,10 @@ from utils.database_queries import (
     get_alcaldia_boundaries
 )
 from geopy.geocoders import Nominatim
+import time
+import ssl
+import certifi
+from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 
 # Can't do BallTree in query, so use another function here.
 @st.cache_data
@@ -185,11 +189,29 @@ def get_station_stats(station_name, radius_m=50):
 
 # Crime comparison
 def geocode_address(address):
-    geolocator = Nominatim(user_agent="cdmx_crime_map")
-    location = geolocator.geocode(f"{address}, Mexico City", timeout=10)
-    if location:
-        return {"lat": location.latitude, "lon": location.longitude, "name": location.address}
-    return None
+    # --- SSL fix by Gemini ---
+    # 1. Create a default SSL context that uses certifi's certificates
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    
+    # 2. Pass the 'ssl_context=ctx' when you create the geolocator
+    geolocator = Nominatim(
+        user_agent="cdmx_crime_map",
+        ssl_context=ctx  # This line is the key
+    )
+    # -----------------------
+
+    try:
+        # Respect the 1-request-per-second policy
+        time.sleep(1) 
+        
+        location = geolocator.geocode(f"{address}, Mexico City", timeout=10)
+        
+        if location:
+            return {"lat": location.latitude, "lon": location.longitude, "name": location.address}
+        return None
+    except (GeocoderTimedOut, GeocoderServiceError, Exception) as e:
+        print(f"Error geocoding {address}: {e}")
+        return None
 
 def get_crimes_near_point(lat, lon, radius_m=100):
     df_crimes = get_crimes()
@@ -199,7 +221,7 @@ def get_crimes_near_point(lat, lon, radius_m=100):
     r = radius_m / 6371000.0
     idxs = tree.query_radius(point, r=r)[0]
     nearby = df_crimes.iloc[idxs].copy()
-    nearby['hora'] = pd.to_datetime(nearby['fecha_hecho']).dt.hour
+    nearby['hora'] = pd.to_datetime(nearby['hora_hecho']).dt.hour
     return nearby
 
 def summarize_crimes(df):
@@ -214,26 +236,3 @@ def summarize_crimes(df):
         "most_common_robo": most_common_robo,
         "avg_hour": avg_hour
     }
-
-def plot_comparison_map(station_coords, station_name, address_coords, address_label):
-    m = folium.Map(location=[19.4326, -99.1332], zoom_start=11, tiles="CartoDB positron")
-
-    folium.CircleMarker(
-        location=station_coords,
-        radius=10,
-        color="#2B7DE9",
-        fill=True,
-        fill_opacity=0.9,
-        popup=f"<b>Estación:</b> {station_name}"
-    ).add_to(m)
-
-    folium.CircleMarker(
-        location=address_coords,
-        radius=10,
-        color="#2BDE73",
-        fill=True,
-        fill_opacity=0.9,
-        popup=f"<b>Dirección:</b> {address_label}"
-    ).add_to(m)
-
-    return m

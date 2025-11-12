@@ -7,7 +7,6 @@ from utils.map_visualization import (
     get_crimes_near_point,
     summarize_crimes,
     get_station_stats,
-    plot_comparison_map
 )
 import pandas as pd
 
@@ -96,12 +95,3 @@ if address_query and comparison_station:
             ]
         }
         st.table(pd.DataFrame(comparison_data, index=["Estación", "Dirección"]))
-
-        st.markdown("### Mapa de comparación")
-        m2 = plot_comparison_map(
-            station_coords=(station['lat'], station['lon']),
-            station_name=station['nombre'],
-            address_coords=(location['lat'], location['lon']),
-            address_label=location['name']
-        )
-        st.components.v1.html(m2._repr_html_(), height=600)
