@@ -7,7 +7,8 @@ from sklearn.neighbors import BallTree
 from utils.database_queries import (
     get_crimes,
     get_metro_stations,
-    get_alcaldia_boundaries
+    get_alcaldia_boundaries,
+    get_crimes_by_year
 )
 from geopy.geocoders import Nominatim
 import time
@@ -17,8 +18,8 @@ from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 
 # Can't do BallTree in query, so use another function here.
 @st.cache_data
-def get_crime_counts_per_station(radius_m=100):
-    df_crimes = get_crimes()
+def get_crime_counts_per_station(radius_m=100, year=None):
+    df_crimes = get_crimes_by_year(radius_m=radius_m, year=year)
     df_stations = get_metro_stations()
 
     # Prepare coordinates in radians
@@ -49,8 +50,8 @@ def get_crime_counts_per_station(radius_m=100):
 
 # Plot static Folium map
 @st.cache_data
-def plot_crime_density_map(radius_m=100, highlight_station=None):
-    df_stations = get_crime_counts_per_station(radius_m=radius_m)
+def plot_crime_density_map(radius_m=100, highlight_station=None, year=None):
+    df_stations = get_crime_counts_per_station(radius_m=radius_m, year=year)
     df_bounds = get_alcaldia_boundaries()
 
     m = folium.Map(location=[19.3300, -99.1032], zoom_start=10, tiles="CartoDB positron")
@@ -152,7 +153,8 @@ def plot_crime_density_map(radius_m=100, highlight_station=None):
     return m
 
 # For search bar
-def get_station_stats(station_name, radius_m=50):
+@st.cache_data
+def get_station_stats(station_name, radius_m=50, year=None):
     df_crimes = get_crimes()
     df_stations = get_metro_stations()
 
@@ -173,14 +175,22 @@ def get_station_stats(station_name, radius_m=50):
     nearby_crimes['hora'] = pd.to_datetime(nearby_crimes['hora_hecho']).dt.hour
 
     total = len(nearby_crimes)
+    
+    # Filter crimes by year (assuming year is an int like 2020)
+    total_yearly = nearby_crimes[nearby_crimes['anio_hecho'].astype(int) == year]
+    total_yearly_count = len(total_yearly)
     robos = nearby_crimes[nearby_crimes['delito'].str.contains('ROBO', case=False)]
     robo_count = len(robos)
+    robos_yearly = robos[robos['anio_hecho'].astype(int) == year]
+    robos_yearly_count = len(robos_yearly)
     most_common_robo = robos['delito'].value_counts().idxmax() if not robos.empty else None
     avg_hour = int(nearby_crimes['hora'].mean()) if not nearby_crimes.empty else None
 
     stats = {
         "total_crimes": total,
+        "total_crimes_yearly": total_yearly_count,
         "robos": robo_count,
+        "robos_yearly": robos_yearly_count,
         "most_common_robo": most_common_robo,
         "avg_hour": avg_hour
     }
@@ -188,6 +198,7 @@ def get_station_stats(station_name, radius_m=50):
     return station, stats
 
 # Crime comparison
+@st.cache_data
 def geocode_address(address):
     # --- SSL fix by Gemini ---
     # 1. Create a default SSL context that uses certifi's certificates
@@ -213,6 +224,7 @@ def geocode_address(address):
         print(f"Error geocoding {address}: {e}")
         return None
 
+@st.cache_data
 def get_crimes_near_point(lat, lon, radius_m=100):
     df_crimes = get_crimes()
     crime_coords = np.radians(df_crimes[['latitud', 'longitud']].values)
@@ -224,6 +236,7 @@ def get_crimes_near_point(lat, lon, radius_m=100):
     nearby['hora'] = pd.to_datetime(nearby['hora_hecho']).dt.hour
     return nearby
 
+@st.cache_data
 def summarize_crimes(df):
     total = len(df)
     robos = df[df['delito'].str.contains('ROBO', case=False)]

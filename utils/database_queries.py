@@ -21,7 +21,7 @@ def run_query(query: str) -> pd.DataFrame:
 @st.cache_data
 def get_crimes(radius_m=100):
     query = """
-    SELECT latitud, longitud, delito, fecha_hecho, hora_hecho
+    SELECT latitud, longitud, delito, fecha_hecho, hora_hecho, anio_hecho
     FROM crimes_clean
     WHERE latitud IS NOT NULL AND longitud IS NOT NULL
     """
@@ -108,7 +108,6 @@ def get_hourly_robberies():
     """
     return run_query(query)
 
-
 # ----------------------------
 # ------ VISUALIZATION -------
 # ----------------------------
@@ -124,3 +123,13 @@ def get_alcaldia_boundaries():
     """
     return run_query(query)
 
+@st.cache_data
+def get_crimes_by_year(radius_m=100, year=None):
+    year_filter = f"AND CAST(anio_hecho AS INT) = {year}" if year else ""
+    query = f"""
+    SELECT latitud, longitud, delito, fecha_hecho, hora_hecho
+    FROM crimes_clean
+    WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+    {year_filter}
+    """
+    return run_query(query)

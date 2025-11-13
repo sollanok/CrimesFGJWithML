@@ -19,7 +19,7 @@ st.markdown(theme_css(), unsafe_allow_html=True)
 # Page content
 st.title("Visualización")
 
-st.subheader("Robos históricos cerca de estaciones del metro (2015-2024)")
+st.subheader("Robos anuales cerca de estaciones del metro (2016-2024)")
 col1, col2 = st.columns([1, 2])
 
 # Station names
@@ -55,11 +55,23 @@ with col1:
             st.write(f"Hora promedio de los crímenes: **{hour_stat}**")
 
 with col2:
-    m = plot_crime_density_map(highlight_station=station if selected_station else None)
+    selected_year = st.slider(
+    "Selecciona un año para visualizar los robos cerca del metro",
+    min_value=2016,
+    max_value=2024,
+    value=2024,
+    step=1
+    )
+    
+    m = plot_crime_density_map(
+    radius_m=100,
+    highlight_station=station if selected_station else None,
+    year=selected_year
+    )
     st.components.v1.html(m._repr_html_(), height=600)
 
 st.divider()
-st.subheader("Comparación entre dirección y estación (2015-2024)")
+st.subheader("Comparación entre dirección y estación (2016-2024)")
 
 col3, col4 = st.columns([1, 1])
 
