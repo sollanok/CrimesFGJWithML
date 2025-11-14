@@ -31,7 +31,7 @@ def get_crimes(radius_m=100):
 def get_metro_stations():
     query = """
     SELECT nombre, linea, lat, lon
-    FROM lineas_metro
+    FROM lines_metro
     WHERE lat IS NOT NULL AND lon IS NOT NULL
     """
     return run_query(query)
@@ -118,7 +118,7 @@ def get_alcaldia_boundaries():
       "properties.NOMGEO" AS nombre,
       "geometry.type" AS geom_type,
       "geometry.coordinates" AS coordinates
-    FROM limites_alcaldias
+    FROM borough_limits
     WHERE "geometry.type" IN ('Polygon', 'MultiPolygon')
     """
     return run_query(query)
@@ -127,7 +127,7 @@ def get_alcaldia_boundaries():
 def get_crimes_by_year(radius_m=100, year=None):
     year_filter = f"AND CAST(anio_hecho AS INT) = {year}" if year else ""
     query = f"""
-    SELECT latitud, longitud, delito, fecha_hecho, hora_hecho
+    SELECT latitud, longitud, delito, fecha_hecho, hora_hecho, mes_hecho
     FROM crimes_clean
     WHERE latitud IS NOT NULL AND longitud IS NOT NULL
     {year_filter}

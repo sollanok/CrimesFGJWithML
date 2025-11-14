@@ -7,25 +7,26 @@ import json
 
 from unidecode import unidecode
 
-# Base path to the root of your project
+# Base path to the root
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-# Path to the data folder
+# Path to the 'data' folder
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # File paths
 DB_FILE = os.path.join(DATA_DIR, "crimes_FGJ.db")
 CRIME_CSV = os.path.join(DATA_DIR, "carpetasFGJ_acumulado_2025_01.csv")
-ALCALDIAS_GEOJSON = os.path.join(DATA_DIR, "alcaldias_cdmx.geojson")
-ESTACIONES_GEOJSON = os.path.join(DATA_DIR, "estaciones_metro.geojson")
-LIMITES_JSON = os.path.join(DATA_DIR, "limite-de-las-alcaldas.json")
-LINEAS_CSV = os.path.join(DATA_DIR, "lineas_metro.csv")
+BOROUGH_JSON = os.path.join(DATA_DIR, "limite-de-las-alcaldas.json")
+METRO_CSV = os.path.join(DATA_DIR, "lineas_metro.csv")
+AFFLUENCE_CSV = os.path.join(DATA_DIR, "affluence_with_num_key.csv")
 
 # ----------------------------
 # ---- Cleaning Functions ----
 # ----------------------------
+'''
 def strip_accents_upper(text):
     return unidecode(str(text)).upper().strip() if pd.notna(text) else text
+'''
 
 def load_data():
     try:
@@ -48,10 +49,11 @@ def clean_data(df):
     df['hora_hecho_dt'] = pd.to_datetime(df.get('hora_hecho'), errors='coerce').dt.time
 
     # Normalize text
+    '''
     for col in ['delito', 'alcaldia_hecho', 'colonia_hecho']:
         if col in df.columns:
             df[col + '_N'] = df[col].apply(strip_accents_upper).fillna('UNKNOWN')
-
+    '''
     # Drop duplicates and missing criticals
     df.drop_duplicates(inplace=True)
     df.dropna(subset=['fecha_hecho', 'hora_hecho', 'delito', 'alcaldia_hecho'], inplace=True)
@@ -103,41 +105,18 @@ def create_database():
 
         # Metro lines CSV
         try:
-            df_lineas = pd.read_csv(LINEAS_CSV, encoding='latin1')
-            df_lineas.dropna(how='all', inplace=True)
-            df_lineas = df_lineas[df_lineas.apply(lambda row: row.count() > 1, axis=1)]
-            con.register("df_lineas", df_lineas)
-            con.execute("CREATE TABLE lineas_metro AS SELECT * FROM df_lineas")
-            print("Table 2: 'lineas_metro' CREATED")
+            df_lines = pd.read_csv(METRO_CSV, encoding='latin1')
+            df_lines.dropna(how='all', inplace=True)
+            df_lines = df_lines[df_lines.apply(lambda row: row.count() > 1, axis=1)]
+            con.register("df_lines", df_lines)
+            con.execute("CREATE TABLE lines_metro AS SELECT * FROM df_lines")
+            print("Table 2: 'lines_metro' CREATED")
         except Exception as e:
-            print(f"Error loading 'lineas_metro': {e}")
+            print(f"Error loading 'lines_metro': {e}")
             
-        # Alcaldías GeoJSON
+        # Borough limits JSON
         try:
-            with open(ALCALDIAS_GEOJSON, encoding='utf-8') as f:
-                raw = json.load(f)
-        
-            df_alcaldias = pd.json_normalize(raw['features'])
-            df_alcaldias.dropna(how='all', inplace=True)
-            con.register("df_alcaldias", df_alcaldias)
-            con.execute("CREATE TABLE alcaldias_cdmx AS SELECT * FROM df_alcaldias")
-            print("Table 3: 'alcaldias_cdmx' CREATED")
-        except Exception as e:
-            print(f"Error loading 'estaciones_metro': {e}")
-        
-        # Estaciones Metro GeoJSON
-        try:
-            df_estaciones = pd.read_json(ESTACIONES_GEOJSON)
-            df_estaciones.dropna(how='all', inplace=True)
-            con.register("df_estaciones", df_estaciones)
-            con.execute("CREATE TABLE estaciones_metro AS SELECT * FROM df_estaciones")
-            print("Table 4: 'estaciones_metro' CREATED")
-        except Exception as e:
-            print(f"Error loading 'estaciones_metro': {e}")
-            
-        # Límites de alcaldías JSON
-        try:
-            with open(LIMITES_JSON, encoding='utf-8') as f:
+            with open(BOROUGH_JSON, encoding='utf-8') as f:
                 raw = json.load(f)
             # If it's a GeoJSON FeatureCollection
             if 'features' in raw:
@@ -146,15 +125,26 @@ def create_database():
                 df_limites = pd.json_normalize(raw)
             df_limites.dropna(how='all', inplace=True)
             con.register("df_limites", df_limites)
-            con.execute("CREATE TABLE limites_alcaldias AS SELECT * FROM df_limites")
-            print("Table 5: 'limites_alcaldias' CREATED")
+            con.execute("CREATE TABLE borough_limits AS SELECT * FROM df_limites")
+            print("Table 3: 'borough_limits' CREATED")
         except Exception as e:
-            print(f"Error loading 'limites_alcaldias': {e}")
+            print(f"Error loading 'borough_limits': {e}")
+        
+        # Daily Affluence CSV
+        try:
+            df_affluence = pd.read_csv(AFFLUENCE_CSV, encoding='latin1')
+            df_affluence.dropna(how='all', inplace=True)
+            df_affluence = df_affluence[df_affluence.apply(lambda row: row.count() > 1, axis=1)]
+            con.register("df_affluence", df_affluence)
+            con.execute("CREATE TABLE daily_affluence AS SELECT * FROM df_affluence")
+            print("Table 4: 'daily_affluence' CREATED")
+        except Exception as e:
+            print(f"Error loading 'daily_affluence': {e}")
 
         # Confirm row counts
-        for table in ["crimes_clean", "lineas_metro", "alcaldias_cdmx", "estaciones_metro", "limites_alcaldias"]:
+        for table in ["crimes_clean", "lines_metro", "borough_limits", "daily_affluence"]:
             count = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            print(f"- {table}: {count} filas")
+            print(f"- {table}: {count} rows")
 
         con.close()
         print("\nDone!")
