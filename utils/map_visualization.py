@@ -7,19 +7,15 @@ from sklearn.neighbors import BallTree
 from utils.database_queries import (
     get_crimes,
     get_metro_stations,
-    get_alcaldia_boundaries,
-    get_crimes_by_year
+    get_alcaldia_boundaries
 )
 from geopy.geocoders import Nominatim
-import time
-import ssl
-import certifi
-from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+import pydeck as pdk
 
 # Can't do BallTree in query, so use another function here.
 @st.cache_data
-def get_crime_counts_per_station(radius_m=100, year=None):
-    df_crimes = get_crimes_by_year(radius_m=radius_m, year=year)
+def get_crime_counts_per_station(radius_m=100):
+    df_crimes = get_crimes()
     df_stations = get_metro_stations()
 
     # Prepare coordinates in radians
@@ -50,17 +46,14 @@ def get_crime_counts_per_station(radius_m=100, year=None):
 
 # Plot static Folium map
 @st.cache_data
-def plot_crime_density_map(radius_m=100, highlight_station=None, year=None):
-    df_stations = get_crime_counts_per_station(radius_m=radius_m, year=year)
+def plot_crime_density_map(radius_m=200, highlight_station=None):
+    df_stations = get_crime_counts_per_station(radius_m=radius_m)
     df_bounds = get_alcaldia_boundaries()
 
-    m = folium.Map(location=[19.3300, -99.1032], zoom_start=10, tiles="CartoDB positron")
-
-    # Add alcaldía boundaries
+    geojson_features = []
     for _, row in df_bounds.iterrows():
         try:
             coords = json.loads(row['coordinates']) if isinstance(row['coordinates'], str) else row['coordinates']
-
             if isinstance(coords, np.ndarray):
                 coords = coords.tolist()
 
@@ -72,89 +65,96 @@ def plot_crime_density_map(radius_m=100, highlight_station=None, year=None):
                 continue
 
             for ring in rings:
-                # Ensure each point is a list of two floats (query returns NumPy array)
-                points = [(float(lat), float(lon)) for lon, lat in ring]
-                folium.Polygon(
-                    locations=points,
-                    color="#555",
-                    weight=1,
-                    fill=True,
-                    fill_opacity=0.05,
-                    popup=f"Alcaldía: {row['nombre']}"
-                ).add_to(m)
-
+                geojson_features.append({
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[(lon, lat) for lon, lat in ring]]
+                    },
+                    "properties": {"nombre": row["nombre"]}
+                })
         except Exception as e:
-            print(f"Error drawing polygon: {e}")
+            print(f"Error parsing polygon: {e}")
 
-    crime_layers = {
-        "no_robberies": folium.FeatureGroup(name="0 robos", show=True),
-        "low_robberies": folium.FeatureGroup(name="Menos de 100 robos (Bajo)", show=True),
-        "medium_robberies": folium.FeatureGroup(name="Menos de 300 robos (Medio)", show=True),
-        "high_robberies": folium.FeatureGroup(name="Menos de 500 robos (Alto)", show=True),
-        "very_high_robberies": folium.FeatureGroup(name="Menos de 800 Robos (Muy Alto)", show=True),
-        "extreme_robberies": folium.FeatureGroup(name="800+ robos (Extremo)", show=True)
+    geojson_data = {
+        "type": "FeatureCollection",
+        "features": geojson_features
     }
-    
-    for _, row in df_stations.iterrows():
-        count = row['crime_count']
-        
-        popup = folium.Popup(f"<b>Línea del metro:</b> {row['linea']:.0f}<br><b>Robos:</b> {count:.0f}", max_width=250)
-        radius = 3 + count**0.2
-        
-        if count == 0:
-            color = "#00000034"
-            radius = 3
-            target_layer = crime_layers["no_robberies"]
-            
-        elif count < 100:
-            color = "#C4E10D"
-            target_layer = crime_layers["low_robberies"]
-            
-        elif count < 300:
-            color = "#F2D324"
-            target_layer = crime_layers["medium_robberies"]
-            
-        elif count < 500:
-            color = "#FF9502"
-            target_layer = crime_layers["high_robberies"]
-            
-        elif count < 800:
-            color = "#E86020"
-            target_layer = crime_layers["very_high_robberies"]
-            
-        else:
-            color = "#B12B2B"
-            target_layer = crime_layers["extreme_robberies"]
-        
-        folium.CircleMarker(
-            location=[row['lat'], row['lon']],
-            radius=radius,
-            color=color,
-            fill=True,
-            fill_opacity=0.6,
-            popup=popup
-        ).add_to(target_layer)
 
-    for layer in crime_layers.values():
-        layer.add_to(m)
+    # Hexagon layer for crime density
+    hex_layer = pdk.Layer(
+        "HexagonLayer",
+        data=df_stations,
+        get_position=["lon", "lat"],
+        radius=radius_m,
+        elevation_scale=100,
+        elevation_range=[0, 1000],
+        pickable=True,
+        extruded=True,
+        getElevationWeight="crime_count",
+        elevationAggregation="SUM",
+        colorRange=[
+            [0, 0, 0],
+            [173, 255, 47],
+            [255, 215, 0],
+            [255, 140, 0],
+            [255, 69, 0],
+            [139, 0, 0]
+        ]
+    )
 
-    folium.LayerControl(collapsed=False).add_to(m)
-
+    # Optional highlight layer
+    highlight_layer = None
     if highlight_station is not None:
-        folium.CircleMarker(
-            location=[highlight_station['lat'], highlight_station['lon']],
-            radius=10,
-            color="#2B7DE9",
-            fill=True,
-            fill_opacity=0.9,
-            popup=folium.Popup(f"<b>Estación {highlight_station['nombre']}</b><br>Línea: {highlight_station['linea']}", max_width=250)
-        ).add_to(m)
+        highlight_layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=[highlight_station.to_dict()],
+            get_position=["lon", "lat"],
+            get_radius=1000,
+            get_color=[43, 125, 233],
+            pickable=True
+        )
 
-    return m
+    # Alcaldía boundary layer
+    boundary_layer = pdk.Layer(
+        "GeoJsonLayer",
+        data=geojson_data,
+        stroked=True,
+        filled=False,
+        get_line_color=[80, 80, 80],
+        line_width_min_pixels=1
+    )
+
+    view_state = pdk.ViewState(
+        latitude=19.4,
+        longitude=-99.1,
+        zoom=11.5,
+        pitch=0,
+        bearing=0
+    )
+
+    layers = [boundary_layer, hex_layer]
+    if highlight_layer:
+        layers.append(highlight_layer)
+
+    tooltip_config = {
+        "html": (
+        "<b>Robos:</b> {crime_count}<br />"
+        "<b>Estación:</b> {nombre}"
+        "<b>Estación:</b> {linea}"
+        ),
+    }
+
+    return pdk.Deck(
+        layers=layers,
+        initial_view_state=view_state,
+        map_provider="carto",
+        map_style="light",
+        tooltip=tooltip_config
+    )
 
 # For search bar
-@st.cache_data
-def get_station_stats(station_name, radius_m=50, year=None):
+def get_station_stats(station_name, radius_m=50):
     df_crimes = get_crimes()
     df_stations = get_metro_stations()
 
@@ -175,22 +175,14 @@ def get_station_stats(station_name, radius_m=50, year=None):
     nearby_crimes['hora'] = pd.to_datetime(nearby_crimes['hora_hecho']).dt.hour
 
     total = len(nearby_crimes)
-    
-    # Filter crimes by year (assuming year is an int like 2020)
-    total_yearly = nearby_crimes[nearby_crimes['anio_hecho'].astype(int) == year]
-    total_yearly_count = len(total_yearly)
     robos = nearby_crimes[nearby_crimes['delito'].str.contains('ROBO', case=False)]
     robo_count = len(robos)
-    robos_yearly = robos[robos['anio_hecho'].astype(int) == year]
-    robos_yearly_count = len(robos_yearly)
     most_common_robo = robos['delito'].value_counts().idxmax() if not robos.empty else None
     avg_hour = int(nearby_crimes['hora'].mean()) if not nearby_crimes.empty else None
 
     stats = {
         "total_crimes": total,
-        "total_crimes_yearly": total_yearly_count,
         "robos": robo_count,
-        "robos_yearly": robos_yearly_count,
         "most_common_robo": most_common_robo,
         "avg_hour": avg_hour
     }
@@ -198,33 +190,13 @@ def get_station_stats(station_name, radius_m=50, year=None):
     return station, stats
 
 # Crime comparison
-@st.cache_data
 def geocode_address(address):
-    # --- SSL fix by Gemini ---
-    # 1. Create a default SSL context that uses certifi's certificates
-    ctx = ssl.create_default_context(cafile=certifi.where())
-    
-    # 2. Pass the 'ssl_context=ctx' when you create the geolocator
-    geolocator = Nominatim(
-        user_agent="cdmx_crime_map",
-        ssl_context=ctx  # This line is the key
-    )
-    # -----------------------
+    geolocator = Nominatim(user_agent="cdmx_crime_map")
+    location = geolocator.geocode(f"{address}, Mexico City", timeout=10)
+    if location:
+        return {"lat": location.latitude, "lon": location.longitude, "name": location.address}
+    return None
 
-    try:
-        # Respect the 1-request-per-second policy
-        time.sleep(1) 
-        
-        location = geolocator.geocode(f"{address}, Mexico City", timeout=10)
-        
-        if location:
-            return {"lat": location.latitude, "lon": location.longitude, "name": location.address}
-        return None
-    except (GeocoderTimedOut, GeocoderServiceError, Exception) as e:
-        print(f"Error geocoding {address}: {e}")
-        return None
-
-@st.cache_data
 def get_crimes_near_point(lat, lon, radius_m=100):
     df_crimes = get_crimes()
     crime_coords = np.radians(df_crimes[['latitud', 'longitud']].values)
@@ -233,10 +205,9 @@ def get_crimes_near_point(lat, lon, radius_m=100):
     r = radius_m / 6371000.0
     idxs = tree.query_radius(point, r=r)[0]
     nearby = df_crimes.iloc[idxs].copy()
-    nearby['hora'] = pd.to_datetime(nearby['hora_hecho']).dt.hour
+    nearby['hora'] = pd.to_datetime(nearby['fecha_hecho']).dt.hour
     return nearby
 
-@st.cache_data
 def summarize_crimes(df):
     total = len(df)
     robos = df[df['delito'].str.contains('ROBO', case=False)]
@@ -249,3 +220,26 @@ def summarize_crimes(df):
         "most_common_robo": most_common_robo,
         "avg_hour": avg_hour
     }
+
+def plot_comparison_map(station_coords, station_name, address_coords, address_label):
+    m = folium.Map(location=[19.4326, -99.1332], zoom_start=11, tiles="CartoDB positron")
+
+    folium.CircleMarker(
+        location=station_coords,
+        radius=10,
+        color="#2B7DE9",
+        fill=True,
+        fill_opacity=0.9,
+        popup=f"<b>Estación:</b> {station_name}"
+    ).add_to(m)
+
+    folium.CircleMarker(
+        location=address_coords,
+        radius=10,
+        color="#2BDE73",
+        fill=True,
+        fill_opacity=0.9,
+        popup=f"<b>Dirección:</b> {address_label}"
+    ).add_to(m)
+
+    return m
