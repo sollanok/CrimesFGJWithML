@@ -9,6 +9,7 @@ def get_connection():
 
 def run_query(query: str) -> pd.DataFrame:
     con = get_connection()
+    con.execute("LOAD spatial;")
     try:
         df = con.execute(query).fetchdf()
         return df
@@ -131,5 +132,177 @@ def get_crimes_by_year(radius_m=100, year=None):
     FROM crimes_clean
     WHERE latitud IS NOT NULL AND longitud IS NOT NULL
     {year_filter}
+    """
+    return run_query(query)
+
+@st.cache_data
+def get_affluence_density():
+    query = """
+    SELECT 
+        s.num AS station_id,
+        s.nombre AS station_name,
+        s.lat,
+        s.lon,
+        SUM(a.afluencia) AS total_afluence
+    FROM daily_affluence a
+    JOIN lines_metro s ON a.key = s.num
+    WHERE CAST(a.fecha AS DATE) BETWEEN DATE '2016-01-01' AND DATE '2024-12-31'
+    GROUP BY s.num, s.nombre, s.lat, s.lon
+    ORDER BY total_afluence DESC
+    """
+    return run_query(query)
+
+@st.cache_data
+def get_top_crime_stations(n=5):
+    query = """
+    SELECT s.nombre AS estacion, COUNT(*) AS crime_count
+    FROM crimes_clean c
+    JOIN lines_metro s ON ST_Distance(
+        ST_Point(c.longitud, c.latitud),
+        ST_Point(s.lon, s.lat)
+    ) <= 100
+    WHERE c.latitud IS NOT NULL AND c.longitud IS NOT NULL
+    GROUP BY s.nombre
+    ORDER BY crime_count DESC
+    LIMIT {}
+    """.format(n)
+    return run_query(query)
+
+@st.cache_data
+def get_top_robo_stations(n=5):
+    query = """
+    SELECT s.nombre AS estacion, COUNT(*) AS robo_count
+    FROM crimes_clean c
+    JOIN lines_metro s ON ST_Distance(
+        ST_Point(c.longitud, c.latitud),
+        ST_Point(s.lon, s.lat)
+    ) <= 100
+    WHERE c.latitud IS NOT NULL AND c.longitud IS NOT NULL
+    AND c.delito ILIKE '%ROBO%'
+    GROUP BY s.nombre
+    ORDER BY robo_count DESC
+    LIMIT {}
+    """.format(n)
+    return run_query(query)
+
+@st.cache_data
+def get_top_affluence_stations(n=5):
+    query = """
+    SELECT s.nombre AS estacion, SUM(a.afluencia) AS total_afluence
+    FROM daily_affluence a
+    JOIN lines_metro s ON a.key = s.num
+    WHERE CAST(a.fecha AS DATE) BETWEEN DATE '2016-01-01' AND DATE '2024-12-31'
+    GROUP BY s.nombre
+    ORDER BY total_afluence DESC
+    LIMIT {}
+    """.format(n)
+    return run_query(query)
+
+@st.cache_data
+def get_station_coords(nombre):
+    query = f"""
+    SELECT lat, lon
+    FROM lines_metro
+    WHERE nombre = '{nombre}'
+    """
+    return run_query(query).iloc[0]
+
+@st.cache_data
+def get_total_crimes_station(nombre, radius_m=100):
+    coords = get_station_coords(nombre)
+    query = f"""
+    SELECT COUNT(*) AS total_crimes
+    FROM crimes_clean
+    WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+    AND ST_Distance_Sphere( -- FIXED: Spherical distance in meters
+        ST_Point(longitud, latitud),
+        ST_Point({coords['lon']}, {coords['lat']})
+    ) <= {radius_m}
+    """
+    return run_query(query).iloc[0]["total_crimes"]
+
+@st.cache_data
+def get_total_robos_station(nombre, radius_m=100):
+    coords = get_station_coords(nombre)
+    query = f"""
+    SELECT COUNT(*) AS total_robos
+    FROM crimes_clean
+    WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+    AND delito ILIKE '%robo%'
+    AND ST_Distance_Sphere( -- FIXED: Spherical distance in meters
+        ST_Point(longitud, latitud),
+        ST_Point({coords['lon']}, {coords['lat']})
+    ) <= {radius_m}
+    """
+    return run_query(query).iloc[0]["total_robos"]
+
+@st.cache_data
+def get_most_common_robo_station(nombre, radius_m=100):
+    coords = get_station_coords(nombre)
+    query = f"""
+    SELECT delito, COUNT(*) AS count
+    FROM crimes_clean
+    WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+    AND delito ILIKE '%robo%'
+    AND ST_Distance_Sphere( -- FIXED: Spherical distance in meters
+        ST_Point(longitud, latitud),
+        ST_Point({coords['lon']}, {coords['lat']})
+    ) <= {radius_m}
+    GROUP BY delito
+    ORDER BY count DESC
+    LIMIT 1
+    """
+    return run_query(query).iloc[0]["delito"]
+
+@st.cache_data
+def get_average_time_station(nombre, radius_m=100):
+    coords = get_station_coords(nombre)
+    query = f"""
+    SELECT AVG(EXTRACT(HOUR FROM hora_hecho::TIME)) AS avg_hour,
+            AVG(EXTRACT(MINUTE FROM hora_hecho::TIME)) AS avg_minute
+    FROM crimes_clean
+    WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+    AND ST_Distance_Sphere( -- FIXED: Spherical distance in meters
+        ST_Point(longitud, latitud),
+        ST_Point({coords['lon']}, {coords['lat']})
+    ) <= {radius_m}
+    """
+    return run_query(query).iloc[0]
+
+@st.cache_data
+def get_hotspot_coords_station(nombre, radius_m=100):
+    coords = get_station_coords(nombre)
+    query = f"""
+    SELECT longitud, latitud, COUNT(*) AS count
+    FROM crimes_clean
+    WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+    AND ST_Distance_Sphere( -- FIXED: Spherical distance in meters
+        ST_Point(longitud, latitud),
+        ST_Point({coords['lon']}, {coords['lat']})
+    ) <= {radius_m}
+    GROUP BY longitud, latitud
+    ORDER BY count DESC
+    LIMIT 1
+    """
+    return run_query(query).iloc[0]
+
+@st.cache_data
+def get_crime_counts_per_station(radius_m=100):
+    query = f"""
+    SELECT
+        s.num,
+        s.linea,
+        s.nombre,
+        s.lat,
+        s.lon,
+        COUNT(c.*) AS crime_count
+    FROM lines_metro s
+    JOIN crimes_clean c
+        ON c.latitud IS NOT NULL AND c.longitud IS NOT NULL
+        AND ST_Distance_Sphere( -- Forces spherical distance calculation in meters
+            ST_Point(c.longitud, c.latitud), -- Simplest point creation (lon, lat)
+            ST_Point(s.lon, s.lat)          -- Simplest point creation (lon, lat)
+        ) <= {radius_m} -- Distance is guaranteed to be in meters
+    GROUP BY s.num, s.linea, s.nombre, s.lat, s.lon;
     """
     return run_query(query)
