@@ -1,8 +1,14 @@
 import streamlit as st
-from app.theme import theme_css
-from utils.eda_plotting import plot_near_stations, plot_robbery_pie_chart, plot_crime_heatmap, plot_hourly_robberies
+from assets.css.theme import theme_css
+from utils.eda_plotting import (
+    plot_near_stations,
+    plot_robbery_pie_chart,
+    plot_crime_heatmap,
+    plot_hourly_robberies
+)
 
-# Inject theme
+# ===================== EDA Page =====================
+
 st.markdown(theme_css(), unsafe_allow_html=True)
 
 st.title("Exploración de Datos")

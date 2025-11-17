@@ -1,5 +1,5 @@
 import streamlit as st
-from app.theme import theme_css
+from assets.css.theme import theme_css
 from utils.database_queries import (
     get_metro_stations,
 )

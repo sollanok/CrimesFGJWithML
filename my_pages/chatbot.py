@@ -1,9 +1,17 @@
 import streamlit as st
-from utils.chatbot_backend import get_routing_decision, get_sql_and_answer 
+from utils.chatbot_backend import (
+    get_routing_decision,
+    get_sql_and_answer
+)
+from assets.css.theme import theme_css
+
+# ===================== Chatbot Page =====================
+
+st.markdown(theme_css(), unsafe_allow_html=True)
 
 st.set_page_config(page_title="Chat con experto", layout="wide")
 st.title("Chat con experto de crímenes en la CDMX y sus estaciones del metro")
-st.markdown("Pregunta sobre tipos de delitos, ubicaciones o afluencia del metro.")
+st.markdown("Pregunta sobre estadísticas de delitos, ubicaciones o afluencia del metro de los años 2016 a 2014.")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
@@ -42,7 +50,7 @@ if prompt := st.chat_input("Escribe tu pregunta aquí..."):
 
         if status == "PROCEED":
             with st.chat_message("assistant"):
-                with st.spinner("Generando SQL y consultando la base de datos..."):
+                with st.spinner("Consultando la base de datos..."):
                     response = get_sql_and_answer(prompt) 
                     st.markdown(response)
                     st.session_state.messages.append({"role": "assistant", "content": response})

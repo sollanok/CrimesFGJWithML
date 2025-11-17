@@ -306,3 +306,39 @@ def get_crime_counts_per_station(radius_m=100):
     GROUP BY s.num, s.linea, s.nombre, s.lat, s.lon;
     """
     return run_query(query)
+
+# Model
+def get_metro_coords():
+    query = """
+    SELECT 
+        num AS key, 
+        nombre, 
+        lat, 
+        lon
+    FROM lines_metro
+    """
+    return run_query(query)
+
+def get_all_crimes():
+    query = """
+    SELECT 
+        fecha_hecho, 
+        hora_hecho, 
+        latitud AS lat, 
+        longitud AS lon, 
+        delito
+    FROM crimes_clean
+    WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+    """
+    return run_query(query)
+
+def get_daily_affluence():
+    query = """
+    SELECT 
+        key, 
+        fecha, 
+        afluencia 
+    FROM 
+        daily_affluence
+    """
+    return run_query(query)
