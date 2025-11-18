@@ -29,7 +29,7 @@ with col2:
     st.subheader("Filtrar datos")
     show_affluence = st.checkbox("Agregar afluencia")
     selected_station = st.selectbox(
-        "Busca una estación para saber sus estadísticas",
+        "Busca una estación para saber sus estadísticas:",
         options=station_names,
         index=None,
         placeholder="Ej. Chabacano"

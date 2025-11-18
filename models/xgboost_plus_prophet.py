@@ -424,8 +424,11 @@ def forecast_28d_daily_and_aggregate_weekly(df, prop, scaler, xgb, feat_cols,
     XF  = scaler.transform(future_feat.values)
     yF  = np.clip(xgb.predict(XF), 0, None)
 
+    display_start_date = pd.Timestamp.today().normalize() + pd.Timedelta(days=1)
+    display_dates = pd.date_range(start=display_start_date, periods=28, freq="D")
+
     daily_pred = pd.DataFrame({
-        "ds": future_days,
+        "ds": display_dates,  # <--- Aquí inyectamos las fechas actuales
         "robos_pred_xgb_diario": np.round(yF, 3),
         "yhat_prophet_diario": np.round(future_feat["yhat_prophet"].values, 3)
     })
