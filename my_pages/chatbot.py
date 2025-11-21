@@ -11,7 +11,7 @@ st.markdown(theme_css(), unsafe_allow_html=True)
 
 st.set_page_config(page_title="Chat con experto", layout="wide")
 st.title("Chat con experto de crímenes en la CDMX y sus estaciones del metro")
-st.markdown("Pregunta sobre estadísticas de delitos, ubicaciones o afluencia del metro de los años 2016 a 2014.")
+st.markdown("Pregunta sobre estadísticas de delitos, ubicaciones o afluencia del metro de los años 2016 a 2024.")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [

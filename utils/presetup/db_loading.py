@@ -23,14 +23,15 @@ AFFLUENCE_CSV = os.path.join(DATA_DIR, "affluence_with_num_key.csv")
 # ----------------------------
 # ---- Cleaning Functions ----
 # ----------------------------
-'''
-def strip_accents_upper(text):
-    return unidecode(str(text)).upper().strip() if pd.notna(text) else text
-'''
+def read_csv_utf8_fallback(path):
+    try:
+        return pd.read_csv(path, encoding='utf-8')
+    except UnicodeDecodeError:
+        return pd.read_csv(path, encoding='latin1')
 
 def load_data():
     try:
-        df = pd.read_csv(CRIME_CSV, low_memory=False)
+        df = pd.read_csv(CRIME_CSV, encoding='latin1', low_memory=False)
         print("Data loaded successfully.")
         return df
     except FileNotFoundError:
@@ -48,12 +49,6 @@ def clean_data(df):
     df['fecha_hecho'] = pd.to_datetime(df.get('fecha_hecho'), errors='coerce')
     df['hora_hecho_dt'] = pd.to_datetime(df.get('hora_hecho'), errors='coerce').dt.time
 
-    # Normalize text
-    '''
-    for col in ['delito', 'alcaldia_hecho', 'colonia_hecho']:
-        if col in df.columns:
-            df[col + '_N'] = df[col].apply(strip_accents_upper).fillna('UNKNOWN')
-    '''
     # Drop duplicates and missing criticals
     df.drop_duplicates(inplace=True)
     df.dropna(subset=['fecha_hecho', 'hora_hecho', 'delito', 'alcaldia_hecho'], inplace=True)
@@ -105,7 +100,7 @@ def create_database():
 
         # Metro lines CSV
         try:
-            df_lines = pd.read_csv(METRO_CSV, encoding='latin1')
+            df_lines = read_csv_utf8_fallback(METRO_CSV)
             df_lines.dropna(how='all', inplace=True)
             df_lines = df_lines[df_lines.apply(lambda row: row.count() > 1, axis=1)]
             con.register("df_lines", df_lines)

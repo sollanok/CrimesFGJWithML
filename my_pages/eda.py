@@ -10,6 +10,7 @@ from utils.eda_plotting import (
 # ===================== EDA Page =====================
 
 st.markdown(theme_css(), unsafe_allow_html=True)
+st.set_page_config(page_title="Exploración de datos", layout="wide")
 
 st.title("Exploración de Datos")
 
@@ -29,7 +30,7 @@ with st.expander("Generación de Hipótesis", expanded=False):
 
 st.markdown("""
 <div style='text-align: center; padding: 1em;'>
-    <h2 style='font-size: 32px; font-weight: bold; color: #d17c00;'>Hipótesis</h2>
+    <h2 style='font-size: 32px; font-weight: bold; color: #AD3654;'>Hipótesis</h2>
     <p style='font-size: 20px; max-width: 800px; margin: auto;'>
         El riesgo de robo en la Ciudad de México aumenta en horarios clave de la jornada laboral 
         (6:00-8:00 a.m., 1:00-3:00 p.m. y 5:00-7:00 p.m.), particularmente los lunes y viernes —días tradicionales de pago conocidos como “quincenas”—, 

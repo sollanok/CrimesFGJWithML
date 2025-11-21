@@ -9,8 +9,10 @@ from utils.map_visualization import (
     view_tables
 )
 
+# ===================== Visualization Page =====================
+
 # Make side margins larger
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="Visualización", layout="wide")
 
 # Inject theme
 st.markdown(theme_css(), unsafe_allow_html=True)

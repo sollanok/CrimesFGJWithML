@@ -101,7 +101,7 @@ def plot_near_stations():
                            paper_bgcolor='rgba(0,0,0,0)',
                            plot_bgcolor='rgba(0,0,0,0)'
                            )
-        fig1.update_traces(marker_color='#A62639')
+        fig1.update_traces(marker_color='#E7BB67')
         fig1.update_yaxes(title_text="Línea del metro", automargin=True)
         
         st.plotly_chart(fig1, use_container_width=True)
@@ -124,8 +124,8 @@ def plot_near_stations():
                            paper_bgcolor='rgba(0,0,0,0)',
                            plot_bgcolor='rgba(0,0,0,0)'
                            )
-        fig2.update_traces(marker_color='#D5AC4E')
-        fig2.update_yaxes(title_text="Línea", automargin=True)
+        fig2.update_traces(marker_color='#9F2241')
+        fig2.update_yaxes(title_text="Línea del metro", automargin=True)
 
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -146,7 +146,7 @@ def plot_robbery_pie_chart():
     top_borough = top_5_boroughs['alcaldia_hecho'].iloc[0]
     top_value = top_5_boroughs['robbery_count'].iloc[0]
 
-    plotly_colors = ['#D5AC4E', '#A62639', '#231123', '#474B24', '#0C7C59']
+    plotly_colors = ['#9F2241', '#E7BB67', "#6F58D2", '#474B24', '#0C7C59']
     
     fig = px.pie(
         top_5_boroughs,
@@ -255,8 +255,8 @@ import plotly.graph_objects as go
 
 def plot_hourly_robberies():
     df = get_hourly_robberies()
-    WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-    colors = ['#D5AC4E', '#A62639', '#BD93BD', '#474B24', '#0C7C59','#BCE784','#30C5FF']
+    WEEKDAYS_SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+    colors = ['#9F2241', '#E7BB67', '#BD93BD', "#EC5656", '#0C7C59','#BCE784','#30C5FF']
 
     fig = go.Figure()
 

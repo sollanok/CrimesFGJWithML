@@ -17,30 +17,30 @@ def theme_css() -> str:
   --muted: #475569;
   --primary: #3b82f6;
   --border: #e5e7eb;
-  --segmented-active: #A62639;
+  --segmented-active: #D04B6C;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #271D06;
-    --bg-alt: #1E1504;
+    --bg: #053026;
+    --bg-alt: #0C1F1A;
     --fg: #E6E9EF;
-    --muted: #a0a3ad;
-    --primary: #FFD700;
-    --border: #5C3B00;
-    --segmented-active: #A62639;
+    --muted: #405550;
+    --primary: #058F6F;
+    --border: #0D6A55;
+    --segmented-active: #D04B6C;
   }
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #FFF2D6;
-    --bg-alt: #F5E6C2;
+    --bg: #C0D9D3;
+    --bg-alt: #8DD9C7;
     --fg: #111111;
-    --muted: #475569;
-    --primary: #3b82f6;
+    --muted: #7A9B94;
+    --primary: #43CBAB;
     --border: #e5e7eb;
-    --segmented-active: #A62639;
+    --segmented-active: #D04B6C;
   }
 }
 
@@ -82,17 +82,14 @@ textarea, .stTextInput input, .stNumberInput input, .stTextArea textarea,
 }
 
 .stButton > button, .stDownloadButton > button {
-  background-color: #D5AC4E !important;
+  background-color: #D04B6C !important;
   color: #111111 !important;
-  border: 1px solid #b88f3f !important;
-  border-radius: 5px;
   font-weight: bold;
 }
 
 .stButton > button:hover,
 [data-testid="stSidebar"] .stButton > button:hover {
-  background-color: #c49b3f !important;
-  border-color: #a87f2e !important;
+  background-color: #F986A2 !important;
 }
 
 hr {
@@ -126,7 +123,7 @@ hr {
 
 [data-testid="stSidebar"] .stButton > button,
 [data-testid="stSidebar"] .stDownloadButton > button {
-  background-color: #D5AC4E !important;
+  background-color: #D04B6C !important;
   color: #111111 !important;
   border: 1px solid #b88f3f !important;
   border-radius: 5px;

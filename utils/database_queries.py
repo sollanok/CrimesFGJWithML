@@ -255,6 +255,23 @@ def get_most_common_robo_station(nombre, radius_m=100):
     return run_query(query).iloc[0]["delito"]
 
 @st.cache_data
+def get_top_3_delitos_station(nombre, radius_m=100):
+    coords = get_station_coords(nombre)
+    query = f"""
+    SELECT delito, COUNT(*) AS count
+    FROM crimes_clean
+    WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+    AND ST_Distance_Sphere(
+        ST_Point(longitud, latitud),
+        ST_Point({coords['lon']}, {coords['lat']})
+    ) <= {radius_m}
+    GROUP BY delito
+    ORDER BY count DESC
+    LIMIT 3
+    """
+    return run_query(query)
+
+@st.cache_data
 def get_average_time_station(nombre, radius_m=100):
     coords = get_station_coords(nombre)
     query = f"""
@@ -312,7 +329,8 @@ def get_metro_coords():
     query = """
     SELECT 
         num AS key, 
-        nombre, 
+        nombre,
+        linea,
         lat, 
         lon
     FROM lines_metro

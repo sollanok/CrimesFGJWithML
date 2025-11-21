@@ -5,6 +5,9 @@ import models.xgboost_plus_prophet as model
 import plotly.graph_objects as go
 import plotly.express as px
 from assets.css.theme import theme_css
+import pydeck as pdk
+import time
+from utils.map_visualization import plot_prediction_animated_map
 
 # ===================== Model Prediction Page =====================
 
@@ -29,12 +32,13 @@ if stations_df.empty:
     st.stop()
 
 st.header("Configuración de análisis")
-    
+
 stations_df['display_name'] = stations_df['nombre']
-    
+station_names = sorted(stations_df['nombre'].astype(str).unique())
+
 selected_station_display = st.selectbox(
     "Selecciona una estación de metro:",
-    options=stations_df['display_name'],
+    options=station_names,
     index=None,
     placeholder="Ej. Chabacano"
 )
@@ -94,6 +98,8 @@ if 'prediction_results' in st.session_state and st.session_state['prediction_res
             "tipo_probable": "Tipo de crimen probable"
         })
         
+        pred_df["Tipo de crimen probable"] = pred_df["Tipo de crimen probable"].str.capitalize()
+
         next_week = pred_df.iloc[0]
         st.subheader(f"Predicción de la **semana del {pd.to_datetime(next_week['Semana termina el']) - pd.Timedelta(days=6):%Y-%m-%d} al {next_week['Semana termina el']}:**")
         
@@ -101,7 +107,7 @@ if 'prediction_results' in st.session_state and st.session_state['prediction_res
         cols_metric[0].metric("Nivel de riesgo", next_week['Nivel de riesgo'])
         cols_metric[1].metric("Probabilidad de evento", f"{next_week['Prob. de evento (%)']:.1f}%")
         cols_metric[2].metric("Día más probable", next_week['Día más probable'])
-        crime_text = next_week['Tipo de crimen probable'].capitalize()
+        crime_text = next_week['Tipo de crimen probable']
         cols_metric[3].markdown(
             f"""
             <div style="margin-bottom: 0px;">
@@ -122,8 +128,68 @@ if 'prediction_results' in st.session_state and st.session_state['prediction_res
             ]],
             hide_index=True,
             width='stretch'
-        )
+            )
+        st.subheader(f"Visualización animada:")
         
+        lat = selected_station_row['lat']
+        lon = selected_station_row['lon']
+
+        min_global_prob = pred_df['Prob. de evento (%)'].min()
+        max_global_prob = pred_df['Prob. de evento (%)'].max()
+
+        col_map_controls = st.columns([3, 1])
+
+        with col_map_controls[0]:
+            week_index = st.slider(
+                "Línea de tiempo de predicción:",
+                min_value=0,
+                max_value=len(pred_df) - 1,
+                value=0,
+                format="Semana +%d"
+            )
+
+        map_placeholder = st.empty()
+
+        with col_map_controls[1]:
+            if st.button("▶️ Animar", type="primary"):
+                progress_bar = st.progress(0)
+        
+                for i in range(len(pred_df)):
+                    row = pred_df.iloc[i]
+            
+                    deck_map = plot_prediction_animated_map(
+                        station_lat=lat,
+                        station_lon=lon,
+                        station_name=selected_name,
+                        prediction_row=row,
+                        radius_m=radius_m
+                    )
+                    
+                    map_placeholder.pydeck_chart(deck_map, height=500, key=f"anim_{i}")
+                    progress_bar.progress((i + 1) / len(pred_df))
+                    time.sleep(0.5)
+            
+                    map_placeholder.pydeck_chart(deck_map, height=500, key=f"anim_{i}")
+
+                    progress_bar.progress((i + 1) / len(pred_df))
+                    time.sleep(3)
+                
+                progress_bar.empty()
+
+        current_row = pred_df.iloc[week_index]
+
+        deck_map = plot_prediction_animated_map(
+            station_lat=lat,
+            station_lon=lon,
+            station_name=selected_name,
+            prediction_row=current_row,
+            radius_m=radius_m,
+        )
+
+        st.caption(f"Mostrando semana: **{current_row['Semana termina el']}** | Riesgo: **{current_row['Prob. de evento (%)']:.1f}%**")
+        
+        # Render to the SAME placeholder used by the animation
+        map_placeholder.pydeck_chart(deck_map, height=500)        
     with tab2:
         st.subheader(f"Análisis de patrones históricos de crimen (radio de {results['radius']}m)")
         
@@ -160,7 +226,7 @@ if 'prediction_results' in st.session_state and st.session_state['prediction_res
                                           paper_bgcolor='rgba(0,0,0,0)',
                                            plot_bgcolor='rgba(0,0,0,0)'
                     )
-                    fig_dow.update_traces(marker_color='#A62639')
+                    fig_dow.update_traces(marker_color='#E7BB67')
 
                     st.plotly_chart(fig_dow, width='stretch')
                 else:
@@ -186,14 +252,15 @@ if 'prediction_results' in st.session_state and st.session_state['prediction_res
                     )
 
                     fig_hour.update_xaxes(dtick=1)
-                    fig_hour.update_traces(marker_color='#D5AC4E')
+                    fig_hour.update_traces(marker_color='#9F2241')
 
                     st.plotly_chart(fig_hour, width='stretch')
                 else:
                     st.info("No hay datos de hora del día.")
             
-            st.markdown("##### Tipos de crímenes más momunes")
+            st.markdown("##### Tipos de crímenes más comunes")
             if not tipo_df.empty:
+                tipo_df["tipo"] = tipo_df["tipo"].str.capitalize()
                 st.dataframe(
                     tipo_df.rename(columns={"tipo": "Tipo de crimen", "porcentaje": "Porcentaje (%)"}),
                     hide_index=True,
@@ -219,7 +286,7 @@ if 'prediction_results' in st.session_state and st.session_state['prediction_res
                 y=hist_df['afluencia'],
                 name='Afluencia',
                 mode='lines',
-                line=dict(color='#D5AC4E')
+                line=dict(color='#9F2241')
             )
         )
 
@@ -229,7 +296,7 @@ if 'prediction_results' in st.session_state and st.session_state['prediction_res
                 y=hist_df['robos'],
                 name='Robos',
                 mode='lines',
-                line=dict(color='#A62639'),
+                line=dict(color='#E7BB67'),
                 yaxis='y2'
             )
         )
@@ -242,14 +309,14 @@ if 'prediction_results' in st.session_state and st.session_state['prediction_res
 
             yaxis=dict(
                 title='Afluencia',
-                title_font=dict(color='#D5AC4E'), 
-                tickfont=dict(color='#D5AC4E')
+                title_font=dict(color='#9F2241'), 
+                tickfont=dict(color='#9F2241')
             ),
     
             yaxis2=dict(
                 title='Robos',
-                title_font=dict(color='#A62639'),
-                tickfont=dict(color='#A62639'),
+                title_font=dict(color='#E7BB67'),
+                tickfont=dict(color='#E7BB67'),
                 overlaying='y',
                 side='right'
             ),
