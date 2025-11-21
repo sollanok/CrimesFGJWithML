@@ -1,11 +1,9 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import models.xgboost_plus_prophet as model
 import plotly.graph_objects as go
 import plotly.express as px
 from assets.css.theme import theme_css
-import pydeck as pdk
 import time
 from utils.map_visualization import plot_prediction_animated_map
 

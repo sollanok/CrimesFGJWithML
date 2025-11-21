@@ -1,7 +1,6 @@
 import json
 import os
 import duckdb
-import pandas as pd
 from google import genai
 import streamlit as st
 
